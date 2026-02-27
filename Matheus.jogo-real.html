@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo Retro dos Anos 90</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+        }
+
+        .container {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #00ff00;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #00ff00;
+            font-size: 2.5em;
+            letter-spacing: 2px;
+        }
+
+        canvas {
+            display: block;
+            background-color: white;
+            border: 3px solid #00ff00;
+            margin: 20px auto;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            cursor: none;
+        }
+
+        .info {
+            color: #00ff00;
+            margin-top: 20px;
+            font-size: 1.1em;
+            line-height: 1.6;
+        }
+
+        .score {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            color: #ffff00;
+            text-shadow: 0 0 5px #ffff00;
+        }
+
+        .controls {
+            color: #00ff00;
+            margin-top: 15px;
+            font-size: 0.95em;
+        }
+
+        .button-group {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        button {
+            background-color: #00ff00;
+            color: #000;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1em;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            background-color: #00cc00;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .game-over-screen {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+            border: 3px solid #ff0000;
+        }
+
+        .game-over-screen h2 {
+            color: #ff0000;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #ff0000;
+        }
+
+        .game-over-screen p {
+            color: #00ff00;
+            font-size: 1.3em;
+            margin-bottom: 20px;
+        }
+
+        .game-over-screen button {
+            margin-top: 20px;
+        }
+
+        .wrapper {
+            position: relative;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 JOGO RETRO DOS ANOS 90 🎮</h1>
+        
+        <div class="wrapper">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <div class="game-over-screen" id="gameOverScreen">
+                <h2>GAME OVER!</h2>
+                <p id="finalScore">Pontuação: 0</p>
+                <button onclick="location.reload()">Jogar Novamente</button>
+            </div>
+        </div>
+
+        <div class="info">
+            <div class="score">Pontuação: <span id="score">0</span></div>
+            <div class="controls">
+                <strong>Controles:</strong><br>
+                ⬅️ Seta Esquerda - Mover para a esquerda<br>
+                ➡️ Seta Direita - Mover para a direita<br>
+                Desvie dos blocos vermelhos!
+            </div>
+            <div class="button-group">
+                <button onclick="togglePause()">Pausar/Retomar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Elementos do canvas
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Cores
+        const WHITE = '#ffffff';
+        const BLACK = '#000000';
+        const RED = '#ff0000';
+        const BLUE = '#0000ff';
+
+        // Configurações do jogador
+        const player = {
+            width: 50,
+            height: 50,
+            x: canvas.width / 2 - 25,
+            y: canvas.height - 60,
+            speed: 5
+        };
+
+        // Configurações dos inimigos
+        const enemyConfig = {
+            width: 50,
+            height: 50,
+            speed: 3
+        };
+
+        // Estado do jogo
+        let enemies = [];
+        let score = 0;
+        let gameOver = false;
+        let isPaused = false;
+        let keys = {};
+
+        // Controle de entrada
+        window.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // Função para desenhar o jogador
+        function drawPlayer() {
+            ctx.fillStyle = BLUE;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            // Adicionar borda
+            ctx.strokeStyle = '#0000aa';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(player.x, player.y, player.width, player.height);
+        }
+
+        // Função para desenhar um inimigo
+        function drawEnemy(enemy) {
+            ctx.fillStyle = RED;
+            ctx.fillRect(enemy.x, enemy.y, enemyConfig.width, enemyConfig.height);
+            // Adicionar borda
+            ctx.strokeStyle = '#aa0000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(enemy.x, enemy.y, enemyConfig.width, enemyConfig.height);
+        }
+
+        // Função para gerar um inimigo
+        function generateEnemy() {
+            const x = Math.random() * (canvas.width - enemyConfig.width);
+            const y = -enemyConfig.height;
+            enemies.push({ x: x, y: y });
+        }
+
+        // Função para mover os inimigos
+        function moveEnemies() {
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                enemies[i].y += enemyConfig.speed;
+                if (enemies[i].y > canvas.height) {
+                    enemies.splice(i, 1);
+                    score += 10; // Aumentar pontuação ao desviar
+                    document.getElementById('score').textContent = score;
+                }
+            }
+        }
+
+        // Função para verificar colisões
+        function checkCollision(playerX, playerY, enemies) {
+            for (let enemy of enemies) {
+                if (playerX < enemy.x + enemyConfig.width &&
+                    playerX + player.width > enemy.x &&
+                    playerY < enemy.y + enemyConfig.height &&
+                    playerY + player.height > enemy.y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Função para mover o jogador
+        function movePlayer() {
+            if ((keys['ArrowLeft'] || keys['a'] || keys['A']) && player.x > 0) {
+                player.x -= player.speed;
+            }
+            if ((keys['ArrowRight'] || keys['d'] || keys['D']) && player.x < canvas.width - player.width) {
+                player.x += player.speed;
+            }
+        }
+
+        // Função para pausar/retomar
+        function togglePause() {
+            if (!gameOver) {
+                isPaused = !isPaused;
+            }
+        }
+
+        // Função para mostrar game over
+        function showGameOver() {
+            const gameOverScreen = document.getElementById('gameOverScreen');
+            document.getElementById('finalScore').textContent = `Pontuação: ${score}`;
+            gameOverScreen.style.display = 'block';
+        }
+
+        // Função principal do jogo
+        function gameLoop() {
+            // Limpar canvas
+            ctx.fillStyle = WHITE;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (!gameOver && !isPaused) {
+                // Mover jogador
+                movePlayer();
+
+                // Gerar inimigos aleatoriamente
+                if (Math.random() < 1 / 30) {
+                    generateEnemy();
+                }
+
+                // Mover inimigos
+                moveEnemies();
+
+                // Verificar colisões
+                if (checkCollision(player.x, player.y, enemies)) {
+                    gameOver = true;
+                    showGameOver();
+                }
+            }
+
+            // Desenhar jogador
+            drawPlayer();
+
+            // Desenhar inimigos
+            for (let enemy of enemies) {
+                drawEnemy(enemy);
+            }
+
+            // Desenhar texto de pausa
+            if (isPaused && !gameOver) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ffff00';
+                ctx.font = 'bold 40px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('PAUSADO', canvas.width / 2, canvas.height / 2);
+            }
+
+            // Continuar o loop
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Iniciar o jogo
+        gameLoop();
+    </script>
+</body>
+</html>
